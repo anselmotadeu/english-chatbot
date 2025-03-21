@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# English Chatbot with Schedule
 
-## Getting Started
+Um chatbot interativo para aprender inglês, com cronograma integrado para organizar seus estudos. Construído com Next.js, Gemma 3 e tecnologias de voz, este projeto é 100% gratuito e hospedado no Vercel.
 
-First, run the development server:
+## Objetivo
+Ajudar o usuário a praticar inglês através de conversas por texto e voz, com correções em tempo real, enquanto organiza aulas e tarefas em um cronograma personalizado.
 
+## Funcionalidades
+### Chatbot
+- **Conversa por Texto**: Dialogue em inglês com o chatbot e receba respostas naturais geradas pelo Gemma 3.
+- **Conversa por Voz**: Fale com o chatbot e ouça respostas faladas (usando Web Speech API para entrada e gTTS para saída).
+- **Correção de Erros**: O chatbot identifica e corrige erros de gramática ou vocabulário em tempo real.
+- **Exercícios**: Pratique com perguntas de vocabulário, completar frases ou traduções.
+- **Níveis**: Suporte a níveis de inglês (Básico, Intermediário, Avançado).
+
+### Cronograma
+- **Tarefas Personalizadas**: Adicione aulas ou metas (ex.: "Estudar verbos às 14h").
+- **Lembretes**: Receba notificações no navegador ou por voz.
+- **Progresso**: Veja quantas tarefas você completou em um gráfico simples.
+
+## Regras do Projeto
+1. **Layout**: 
+   - Interface dividida: à esquerda o cronograma (lista ou calendário), à direita o chat com input de texto e botão de voz.
+   - Estilo moderno, limpo e acolhedor, inspirado em chatbots como Grok.
+2. **Chatbot**:
+   - Respostas devem simular um fluxo de digitação (efeito visual).
+   - Correção de erros em negrito (verde para acertos, vermelho para erros).
+   - Suporte a voz bidirecional (falar e ouvir).
+3. **Cronograma**:
+   - Armazenado no LocalStorage para uso offline.
+   - Opção de adicionar, editar e remover tarefas.
+   - Lembretes ativados por padrão.
+4. **Tecnologia**:
+   - Frontend: Next.js com React.
+   - Backend: Node.js com Gemma 3 (via Hugging Face ou Google AI Studio).
+   - Voz: Web Speech API (entrada) e gTTS (saída).
+   - Hospedagem: Vercel (usando o domínio `codefort.com.br`).
+5. **Gratuito**: Todas as ferramentas devem ser open-source ou com planos gratuitos.
+
+## Como Começar
+### Pré-requisitos
+- Node.js (v18 ou superior)
+- npm ou yarn
+- Conta no Vercel (opcional para deploy)
+- Token do Hugging Face (para Gemma 3)
+
+### Instalação
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/seu-usuario/english-chatbot.git
+   cd english-chatbot
+
+2. Instale as dependências:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Configure as variáveis de ambiente em `.env.local`:
+```text
+HF_TOKEN=seu-token-do-hugging-face
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+4. Rode localmente:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Acesse em `http://localhost:3000`.
 
-## Learn More
+## Deploy no Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Conecte o repositório ao Vercel:
+```bash
+vercel
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Configure o domínio `codefort.com.br` no painel do Vercel.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Estrutura do Projeto
 
-## Deploy on Vercel
+```text
+english-chatbot/
+├── app/
+│   ├── api/
+│   │   └── chat/route.ts      # Integração com Gemma 3
+│   └── page.tsx               # Página principal (chat + cronograma)
+├── components/
+│   ├── Chat.tsx              # Componente do chat
+│   └── Schedule.tsx          # Componente do cronograma
+├── public/                   # Arquivos estáticos
+├── styles/                   # CSS global e modular
+└── README.md
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Próximos Passos
+Adicionar gamificação (pontos por tarefas concluídas).
+Integrar recursos externos (ex.: links para vídeos de inglês).
+Melhorar o design com Tailwind CSS.
+Contribuições
+Sinta-se à vontade para abrir issues ou pull requests!
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Feito com 💙 por [Anselmo Santos] com ajuda do Grok (xAI).
