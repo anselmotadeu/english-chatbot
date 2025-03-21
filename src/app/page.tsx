@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react';
-import { FaCheckCircle, FaPlayCircle, FaPlus, FaMicrophone } from 'react-icons/fa';
+import { FaCheckCircle, FaPlayCircle, FaPlus, FaMicrophone, FaRobot } from 'react-icons/fa';
 
 export default function Home() {
   const [messages, setMessages] = useState<{ user: string; bot: string }[]>([]);
   const [input, setInput] = useState('');
   const [tasks, setTasks] = useState<{ name: string; duration: string; platform: string; completed: boolean; inProgress: boolean }[]>([]);
   const [isListening, setIsListening] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -20,7 +21,8 @@ export default function Home() {
 
   const sendMessage = async (message: string = input) => {
     if (!message.trim()) return;
-    setMessages([...messages, { user: message, bot: '...' }]);
+    setMessages([...messages, { user: message, bot: '' }]);
+    setIsLoading(true);
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -29,13 +31,14 @@ export default function Home() {
       });
       const data = await response.json();
       setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: data.reply }]);
-      // Falar a resposta do bot
       const utterance = new SpeechSynthesisUtterance(data.reply);
       utterance.lang = 'en-US';
       window.speechSynthesis.speak(utterance);
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: 'Sorry, something went wrong.' }]);
+    } finally {
+      setIsLoading(false);
     }
     setInput('');
   };
@@ -165,17 +168,26 @@ export default function Home() {
       </aside>
 
       <main className="w-2/3 p-6 flex flex-col bg-gray-50">
-        <div className="flex-grow overflow-y-auto mb-4 p-4 bg-white rounded-lg shadow-md">
+        <div className="flex items-center mb-4 p-4 bg-blue-500 text-white rounded-t-lg shadow-md">
+          <FaRobot className="text-2xl mr-2" />
+          <h2 className="text-xl font-semibold">English Assistant</h2>
+        </div>
+        <div className="flex-grow overflow-y-auto mb-4 p-4 bg-white rounded-b-lg shadow-md">
           {messages.map((msg, i) => (
             <div key={i} className="mb-4">
               <div className="flex justify-end">
-                <div className="bg-blue-500 text-white p-3 rounded-lg max-w-xs">
+                <div className="bg-blue-500 text-white p-3 rounded-lg max-w-xs shadow-sm">
                   {msg.user}
                 </div>
               </div>
               <div className="flex justify-start mt-2">
-                <div className="bg-gray-200 text-gray-800 p-3 rounded-lg max-w-xs">
-                  {msg.bot}
+                <div className="flex items-start gap-2">
+                  <FaRobot className="text-gray-500 mt-1" />
+                  <div className="bg-gray-100 text-gray-800 p-3 rounded-lg max-w-xs shadow-sm">
+                    {msg.bot || (i === messages.length - 1 && isLoading ? (
+                      <span className="animate-pulse">...</span>
+                    ) : 'Waiting for response...')}
+                  </div>
                 </div>
               </div>
             </div>
@@ -192,7 +204,7 @@ export default function Home() {
             <FaMicrophone />
           </button>
           <input
-            className="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => {
@@ -204,7 +216,7 @@ export default function Home() {
           />
           <button
             onClick={() => sendMessage()}
-            className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+            className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-sm"
           >
             Send
           </button>
