@@ -9,6 +9,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<{ name: string; duration: string; platform: string; completed: boolean; inProgress: boolean }[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'conversation' | 'grammar' | 'listening' | 'voice'>('grammar');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -22,25 +23,27 @@ export default function Home() {
   const sendMessage = async (message: string = input) => {
     if (!message.trim()) return;
     setMessages([...messages, { user: message, bot: '' }]);
+    setInput('');
     setIsLoading(true);
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, mode }),
       });
       const data = await response.json();
       setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: data.reply }]);
-      const utterance = new SpeechSynthesisUtterance(data.reply);
-      utterance.lang = 'en-US';
-      window.speechSynthesis.speak(utterance);
+      if (mode !== 'voice') {
+        const utterance = new SpeechSynthesisUtterance(data.reply);
+        utterance.lang = 'en-US';
+        window.speechSynthesis.speak(utterance);
+      }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: 'Sorry, something went wrong.' }]);
     } finally {
       setIsLoading(false);
     }
-    setInput('');
   };
 
   const startListening = () => {
@@ -168,9 +171,21 @@ export default function Home() {
       </aside>
 
       <main className="w-2/3 p-6 flex flex-col bg-gray-50">
-        <div className="flex items-center mb-4 p-4 bg-blue-500 text-white rounded-t-lg shadow-md">
-          <FaRobot className="text-2xl mr-2" />
-          <h2 className="text-xl font-semibold">English Assistant</h2>
+        <div className="flex items-center justify-between mb-4 p-4 bg-blue-500 text-white rounded-t-lg shadow-md">
+          <div className="flex items-center">
+            <FaRobot className="text-2xl mr-2" />
+            <h2 className="text-xl font-semibold">English Assistant</h2>
+          </div>
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'conversation' | 'grammar' | 'listening' | 'voice')}
+            className="p-2 rounded-lg bg-white text-gray-800 focus:outline-none"
+          >
+            <option value="grammar">Grammar Mode</option>
+            <option value="conversation">Conversation Mode</option>
+            <option value="listening">Listening Mode</option>
+            <option value="voice">Voice Mode</option>
+          </select>
         </div>
         <div className="flex-grow overflow-y-auto mb-4 p-4 bg-white rounded-b-lg shadow-md">
           {messages.map((msg, i) => (
@@ -184,8 +199,31 @@ export default function Home() {
                 <div className="flex items-start gap-2">
                   <FaRobot className="text-gray-500 mt-1" />
                   <div className="bg-gray-100 text-gray-800 p-3 rounded-lg max-w-xs shadow-sm">
-                    {msg.bot || (i === messages.length - 1 && isLoading ? (
-                      <span className="animate-pulse">...</span>
+                    {msg.bot ? (
+                      <div>
+                        {msg.bot.split('**Response:**').map((part, index) => {
+                          if (index === 0) {
+                            const correction = part.replace('**Correction:**', '').trim();
+                            return correction && correction !== 'No corrections needed.' ? (
+                              <p key={index} className="text-sm text-gray-600 italic">
+                                Correction: {correction}
+                              </p>
+                            ) : null;
+                          } else {
+                            return (
+                              <p key={index} className="mt-2">
+                                {part.trim()}
+                              </p>
+                            );
+                          }
+                        })}
+                      </div>
+                    ) : (i === messages.length - 1 && isLoading ? (
+                      <div className="flex gap-1">
+                        <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce1"></span>
+                        <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce2"></span>
+                        <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce3"></span>
+                      </div>
                     ) : 'Waiting for response...')}
                   </div>
                 </div>
