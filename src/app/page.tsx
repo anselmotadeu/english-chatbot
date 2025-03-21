@@ -7,9 +7,9 @@ export default function Home() {
   const [messages, setMessages] = useState<{ user: string; bot: string }[]>([]);
   const [input, setInput] = useState('');
   const [tasks, setTasks] = useState<{ name: string; duration: string; platform: string; completed: boolean; inProgress: boolean }[]>([]);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Função para rolar automaticamente para a última mensagem
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -18,22 +18,60 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    setMessages([...messages, { user: input, bot: '...' }]);
+  const sendMessage = async (message: string = input) => {
+    if (!message.trim()) return;
+    setMessages([...messages, { user: message, bot: '...' }]);
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message }),
       });
       const data = await response.json();
-      setMessages((prev) => [...prev.slice(0, -1), { user: input, bot: data.reply }]);
+      setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: data.reply }]);
+      // Falar a resposta do bot
+      const utterance = new SpeechSynthesisUtterance(data.reply);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      setMessages((prev) => [...prev.slice(0, -1), { user: input, bot: 'Sorry, something went wrong.' }]);
+      setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: 'Sorry, something went wrong.' }]);
     }
     setInput('');
+  };
+
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition API not supported in this browser.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      sendMessage(transcript);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   const addTask = (name: string, duration: string, platform: string) => {
@@ -58,7 +96,6 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Cronograma */}
       <aside className="w-1/3 p-6 bg-white shadow-lg border-r border-gray-200">
         <h2 className="text-2xl font-bold mb-4 text-gray-800">Cronograma</h2>
         <div className="mb-4">
@@ -127,7 +164,6 @@ export default function Home() {
         </ul>
       </aside>
 
-      {/* Chat */}
       <main className="w-2/3 p-6 flex flex-col bg-gray-50">
         <div className="flex-grow overflow-y-auto mb-4 p-4 bg-white rounded-lg shadow-md">
           {messages.map((msg, i) => (
@@ -147,7 +183,12 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
         <div className="flex gap-3">
-          <button className="p-3 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">
+          <button
+            onClick={startListening}
+            className={`p-3 rounded-lg ${
+              isListening ? 'bg-red-500 text-white' : 'bg-gray-300 text-gray-800'
+            } hover:bg-gray-400`}
+          >
             <FaMicrophone />
           </button>
           <input
@@ -162,7 +203,7 @@ export default function Home() {
             placeholder="Type your message..."
           />
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
           >
             Send
