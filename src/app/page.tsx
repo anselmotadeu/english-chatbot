@@ -9,15 +9,20 @@ export default function Home() {
   const [tasks, setTasks] = useState<{ name: string; duration: string; platform: string; completed: boolean; inProgress: boolean }[]>([]);
 
   const sendMessage = async () => {
-    if (!input) return;
+    if (!input.trim()) return; // Evita enviar mensagens vazias
     setMessages([...messages, { user: input, bot: '...' }]);
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: input }),
-    });
-    const data = await response.json();
-    setMessages((prev) => [...prev.slice(0, -1), { user: input, bot: data.reply }]);
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: input }),
+      });
+      const data = await response.json();
+      setMessages((prev) => [...prev.slice(0, -1), { user: input, bot: data.reply }]);
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      setMessages((prev) => [...prev.slice(0, -1), { user: input, bot: 'Sorry, something went wrong.' }]);
+    }
     setInput(''); // Limpa o input após o envio
   };
 
@@ -30,20 +35,19 @@ export default function Home() {
   const toggleTaskCompletion = (index: number) => {
     const updatedTasks = [...tasks];
     updatedTasks[index].completed = !updatedTasks[index].completed;
-    updatedTasks[index].inProgress = false; // Se concluído, não está mais em andamento
+    updatedTasks[index].inProgress = false;
     setTasks(updatedTasks);
   };
 
   const toggleTaskInProgress = (index: number) => {
     const updatedTasks = [...tasks];
     updatedTasks[index].inProgress = !updatedTasks[index].inProgress;
-    updatedTasks[index].completed = false; // Se em andamento, não está concluído
+    updatedTasks[index].completed = false;
     setTasks(updatedTasks);
   };
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Cronograma */}
       <aside className="w-1/3 p-6 bg-white shadow-lg border-r border-gray-200">
         <h2 className="text-2xl font-bold mb-4 text-gray-800">Cronograma</h2>
         <div className="mb-4">
@@ -112,7 +116,6 @@ export default function Home() {
         </ul>
       </aside>
 
-      {/* Chat */}
       <main className="w-2/3 p-6 flex flex-col bg-gray-50">
         <div className="flex-grow overflow-y-auto mb-4 p-4 bg-white rounded-lg shadow-md">
           {messages.map((msg, i) => (
@@ -127,7 +130,11 @@ export default function Home() {
             className="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                sendMessage();
+              }
+            }}
             placeholder="Type your message..."
           />
           <button

@@ -6,9 +6,11 @@ export async function POST(req: Request) {
   const { message } = await req.json();
   const prompt = `You are an English teacher. Respond to this in English and correct any mistakes: ${message}`;
   const response = await hf.textGeneration({
-    model: 'google/gemma-1b',
+    model: 'google/gemma-2b-it', // Modelo corrigido
     inputs: prompt,
-    max_length: 200,
+    parameters: {
+      max_new_tokens: 200, // Ajustado para o formato correto
+    },
   });
   return Response.json({ reply: response.generated_text });
 }
