@@ -1,15 +1,25 @@
 "use client"
 
-import { useState } from 'react';
-import { FaCheckCircle, FaPlayCircle, FaPlus } from 'react-icons/fa';
+import { useState, useEffect, useRef } from 'react';
+import { FaCheckCircle, FaPlayCircle, FaPlus, FaMicrophone } from 'react-icons/fa';
 
 export default function Home() {
   const [messages, setMessages] = useState<{ user: string; bot: string }[]>([]);
   const [input, setInput] = useState('');
   const [tasks, setTasks] = useState<{ name: string; duration: string; platform: string; completed: boolean; inProgress: boolean }[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Função para rolar automaticamente para a última mensagem
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim()) return; // Evita enviar mensagens vazias
+    if (!input.trim()) return;
     setMessages([...messages, { user: input, bot: '...' }]);
     try {
       const response = await fetch('/api/chat', {
@@ -23,7 +33,7 @@ export default function Home() {
       console.error('Erro ao enviar mensagem:', error);
       setMessages((prev) => [...prev.slice(0, -1), { user: input, bot: 'Sorry, something went wrong.' }]);
     }
-    setInput(''); // Limpa o input após o envio
+    setInput('');
   };
 
   const addTask = (name: string, duration: string, platform: string) => {
@@ -48,6 +58,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Cronograma */}
       <aside className="w-1/3 p-6 bg-white shadow-lg border-r border-gray-200">
         <h2 className="text-2xl font-bold mb-4 text-gray-800">Cronograma</h2>
         <div className="mb-4">
@@ -116,16 +127,29 @@ export default function Home() {
         </ul>
       </aside>
 
+      {/* Chat */}
       <main className="w-2/3 p-6 flex flex-col bg-gray-50">
         <div className="flex-grow overflow-y-auto mb-4 p-4 bg-white rounded-lg shadow-md">
           {messages.map((msg, i) => (
             <div key={i} className="mb-4">
-              <p className="text-blue-600 font-semibold">You: {msg.user}</p>
-              <p className="text-gray-800">Bot: {msg.bot}</p>
+              <div className="flex justify-end">
+                <div className="bg-blue-500 text-white p-3 rounded-lg max-w-xs">
+                  {msg.user}
+                </div>
+              </div>
+              <div className="flex justify-start mt-2">
+                <div className="bg-gray-200 text-gray-800 p-3 rounded-lg max-w-xs">
+                  {msg.bot}
+                </div>
+              </div>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
         <div className="flex gap-3">
+          <button className="p-3 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">
+            <FaMicrophone />
+          </button>
           <input
             className="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={input}
