@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useState, useEffect, useRef } from 'react';
 import { FaCheckCircle, FaPlayCircle, FaPlus, FaMicrophone, FaRobot } from 'react-icons/fa';
@@ -9,7 +9,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<{ name: string; duration: string; platform: string; completed: boolean; inProgress: boolean }[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<'conversation' | 'grammar' | 'listening' | 'voice'>('grammar');
+  const [mode, setMode] = useState<'conversation' | 'grammar' | 'listening' | 'voice'>('conversation');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -20,10 +20,15 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
+  // Garantir que as vozes estejam carregadas antes de usar
+  useEffect(() => {
+    window.speechSynthesis.getVoices();
+  }, []);
+
   const sendMessage = async (message: string = input) => {
     if (!message.trim()) return;
     setMessages([...messages, { user: message, bot: '' }]);
-    setInput('');
+    if (mode !== 'voice') setInput('');
     setIsLoading(true);
     try {
       const response = await fetch('/api/chat', {
@@ -33,11 +38,22 @@ export default function Home() {
       });
       const data = await response.json();
       setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: data.reply }]);
-      if (mode !== 'voice') {
-        const utterance = new SpeechSynthesisUtterance(data.reply);
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
-      }
+      
+      // Configurar o áudio com uma voz mais natural
+      const utterance = new SpeechSynthesisUtterance(data.reply);
+      utterance.lang = 'en-US';
+      
+      // Tentar encontrar uma voz mais natural
+      const voices = window.speechSynthesis.getVoices();
+      const naturalVoice = voices.find(voice => voice.name.includes('Google') || voice.name.includes('Natural') || voice.lang === 'en-US') || voices[0];
+      utterance.voice = naturalVoice;
+      
+      // Ajustar tom e velocidade para soar mais humano
+      utterance.pitch = 1.0; // Tom normal
+      utterance.rate = 0.9;  // Fala um pouco mais lenta para maior clareza
+      utterance.volume = 1.0; // Volume máximo
+      
+      window.speechSynthesis.speak(utterance);
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: 'Sorry, something went wrong.' }]);
@@ -64,12 +80,15 @@ export default function Home() {
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setInput(transcript);
+      if (mode !== 'voice') setInput(transcript);
       sendMessage(transcript);
     };
 
     recognition.onend = () => {
       setIsListening(false);
+      if (mode === 'voice' && !isLoading) {
+        startListening();
+      }
     };
 
     recognition.onerror = (event: any) => {
@@ -201,30 +220,37 @@ export default function Home() {
                   <div className="bg-gray-100 text-gray-800 p-3 rounded-lg max-w-xs shadow-sm">
                     {msg.bot ? (
                       <div>
-                        {msg.bot.split('**Response:**').map((part, index) => {
-                          if (index === 0) {
-                            const correction = part.replace('**Correction:**', '').trim();
-                            return correction && correction !== 'No corrections needed.' ? (
-                              <p key={index} className="text-sm text-gray-600 italic">
-                                Correction: {correction}
-                              </p>
-                            ) : null;
-                          } else {
+                        {mode === 'grammar' ? (
+                          (() => {
+                            const parts = msg.bot.split('**Response:**');
+                            const correctionPart = parts[0]?.replace('**Correction:**', '').trim();
+                            const responsePart = parts[1]?.trim();
                             return (
-                              <p key={index} className="mt-2">
-                                {part.trim()}
-                              </p>
+                              <>
+                                {correctionPart && correctionPart !== 'No corrections needed.' && (
+                                  <p className="text-sm text-gray-600 italic">
+                                    Correction: {correctionPart}
+                                  </p>
+                                )}
+                                {responsePart && (
+                                  <p className="mt-2">{responsePart}</p>
+                                )}
+                              </>
                             );
-                          }
-                        })}
+                          })()
+                        ) : (
+                          <p>{msg.bot.trim()}</p>
+                        )}
                       </div>
-                    ) : (i === messages.length - 1 && isLoading ? (
+                    ) : i === messages.length - 1 && isLoading ? (
                       <div className="flex gap-1">
                         <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce1"></span>
                         <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce2"></span>
                         <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce3"></span>
                       </div>
-                    ) : 'Waiting for response...')}
+                    ) : (
+                      'Waiting for response...'
+                    )}
                   </div>
                 </div>
               </div>
@@ -242,19 +268,25 @@ export default function Home() {
             <FaMicrophone />
           </button>
           <input
-            className="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
+            className={`flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm ${
+              mode === 'voice' ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => mode !== 'voice' && setInput(e.target.value)}
             onKeyPress={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && mode !== 'voice') {
                 sendMessage();
               }
             }}
-            placeholder="Type your message..."
+            placeholder={mode === 'voice' ? 'Voice mode: Speak to interact' : 'Type your message...'}
+            disabled={mode === 'voice'}
           />
           <button
             onClick={() => sendMessage()}
-            className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-sm"
+            className={`p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-sm ${
+              mode === 'voice' ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            disabled={mode === 'voice'}
           >
             Send
           </button>
