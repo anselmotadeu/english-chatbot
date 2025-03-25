@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { FaCheckCircle, FaPlayCircle, FaPlus, FaMicrophone, FaRobot } from 'react-icons/fa';
+import { FaCheckCircle, FaPlayCircle, FaPlus, FaMicrophone, FaRobot, FaVolumeUp } from 'react-icons/fa';
 
 export default function Home() {
-  const [messages, setMessages] = useState<{ user: string; bot: string }[]>([]);
+  const [messages, setMessages] = useState<{
+    user: string;
+    bot: string;
+    userTranslation?: string;
+    botTranslation?: string;
+    botUtterance?: SpeechSynthesisUtterance;
+  }[]>([]);
   const [input, setInput] = useState('');
   const [tasks, setTasks] = useState<{ name: string; duration: string; platform: string; completed: boolean; inProgress: boolean }[]>([]);
   const [isListening, setIsListening] = useState(false);
@@ -20,10 +26,24 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
-  // Garantir que as vozes estejam carregadas antes de usar
   useEffect(() => {
     window.speechSynthesis.getVoices();
   }, []);
+
+  const translateText = async (text: string) => {
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await response.json();
+      return data.translation;
+    } catch (error) {
+      console.error('Erro ao traduzir:', error);
+      return 'Erro ao traduzir.';
+    }
+  };
 
   const sendMessage = async (message: string = input) => {
     if (!message.trim()) return;
@@ -31,35 +51,40 @@ export default function Home() {
     if (mode !== 'voice') setInput('');
     setIsLoading(true);
     try {
+      const userTranslation = await translateText(message);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, mode }),
       });
       const data = await response.json();
-      setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: data.reply }]);
+      const botTranslation = await translateText(data.reply);
       
-      // Configurar o áudio com uma voz mais natural
       const utterance = new SpeechSynthesisUtterance(data.reply);
       utterance.lang = 'en-US';
-      
-      // Tentar encontrar uma voz mais natural
       const voices = window.speechSynthesis.getVoices();
       const naturalVoice = voices.find(voice => voice.name.includes('Google') || voice.name.includes('Natural') || voice.lang === 'en-US') || voices[0];
       utterance.voice = naturalVoice;
-      
-      // Ajustar tom e velocidade para soar mais humano
-      utterance.pitch = 1.0; // Tom normal
-      utterance.rate = 0.9;  // Fala um pouco mais lenta para maior clareza
-      utterance.volume = 1.0; // Volume máximo
-      
+      utterance.pitch = 1.0;
+      utterance.rate = 0.9;
+      utterance.volume = 1.0;
       window.speechSynthesis.speak(utterance);
+
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { user: message, bot: data.reply, userTranslation, botTranslation, botUtterance: utterance },
+      ]);
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       setMessages((prev) => [...prev.slice(0, -1), { user: message, bot: 'Sorry, something went wrong.' }]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const replayMessage = (utterance: SpeechSynthesisUtterance) => {
+    window.speechSynthesis.cancel(); // Para qualquer áudio em andamento
+    window.speechSynthesis.speak(utterance);
   };
 
   const startListening = () => {
@@ -210,46 +235,68 @@ export default function Home() {
           {messages.map((msg, i) => (
             <div key={i} className="mb-4">
               <div className="flex justify-end">
-                <div className="bg-blue-500 text-white p-3 rounded-lg max-w-xs shadow-sm">
-                  {msg.user}
+                <div
+                  className="relative bg-blue-500 text-white p-3 rounded-lg max-w-xs shadow-sm group"
+                >
+                  <span>{msg.user}</span>
+                  {msg.userTranslation && (
+                    <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-sm rounded-lg p-2 shadow-lg">
+                      {msg.userTranslation}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex justify-start mt-2">
                 <div className="flex items-start gap-2">
                   <FaRobot className="text-gray-500 mt-1" />
-                  <div className="bg-gray-100 text-gray-800 p-3 rounded-lg max-w-xs shadow-sm">
-                    {msg.bot ? (
-                      <div>
-                        {mode === 'grammar' ? (
-                          (() => {
-                            const parts = msg.bot.split('**Response:**');
-                            const correctionPart = parts[0]?.replace('**Correction:**', '').trim();
-                            const responsePart = parts[1]?.trim();
-                            return (
-                              <>
-                                {correctionPart && correctionPart !== 'No corrections needed.' && (
-                                  <p className="text-sm text-gray-600 italic">
-                                    Correction: {correctionPart}
-                                  </p>
-                                )}
-                                {responsePart && (
-                                  <p className="mt-2">{responsePart}</p>
-                                )}
-                              </>
-                            );
-                          })()
-                        ) : (
-                          <p>{msg.bot.trim()}</p>
-                        )}
-                      </div>
-                    ) : i === messages.length - 1 && isLoading ? (
-                      <div className="flex gap-1">
-                        <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce1"></span>
-                        <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce2"></span>
-                        <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce3"></span>
-                      </div>
-                    ) : (
-                      'Waiting for response...'
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative bg-gray-100 text-gray-800 p-3 rounded-lg max-w-xs shadow-sm group">
+                      {msg.bot ? (
+                        <div>
+                          {mode === 'grammar' ? (
+                            (() => {
+                              const parts = msg.bot.split('**Response:**');
+                              const correctionPart = parts[0]?.replace('**Correction:**', '').trim();
+                              const responsePart = parts[1]?.trim();
+                              return (
+                                <>
+                                  {correctionPart && correctionPart !== 'No corrections needed.' && (
+                                    <p className="text-sm text-gray-600 italic">
+                                      Correction: {correctionPart}
+                                    </p>
+                                  )}
+                                  {responsePart && (
+                                    <p className="mt-2">{responsePart}</p>
+                                  )}
+                                </>
+                              );
+                            })()
+                          ) : (
+                            <p>{msg.bot.trim()}</p>
+                          )}
+                        </div>
+                      ) : i === messages.length - 1 && isLoading ? (
+                        <div className="flex gap-1">
+                          <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce1"></span>
+                          <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce2"></span>
+                          <span className="inline-block w-2 h-2 bg-gray-500 rounded-full animate-bounce3"></span>
+                        </div>
+                      ) : (
+                        'Waiting for response...'
+                      )}
+                      {msg.botTranslation && (
+                        <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-sm rounded-lg p-2 shadow-lg">
+                          {msg.botTranslation}
+                        </div>
+                      )}
+                    </div>
+                    {msg.botUtterance && (
+                      <button
+                        onClick={() => msg.botUtterance && replayMessage(msg.botUtterance)}
+                        className="text-gray-500 hover:text-blue-500"
+                      >
+                        <FaVolumeUp />
+                      </button>
                     )}
                   </div>
                 </div>
